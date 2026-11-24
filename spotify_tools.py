@@ -10,7 +10,7 @@ from spotipy.oauth2 import SpotifyOAuth
 
 from apple_music import Track
 
-SCOPES = "playlist-modify-private playlist-modify-public"
+SCOPES = "user-read-private playlist-modify-private playlist-modify-public"
 TOKEN_FILE = ".spotify_token"
 
 

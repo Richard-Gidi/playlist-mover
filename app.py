@@ -190,7 +190,12 @@ else:
             try:
                 hit, s, how = match_track(sp, t)
             except spotipy.SpotifyException as e:
-                hit, s, how = None, 0.0, f"error: {e.http_status}"
+                hit, s, how = None, 0.0, f"error {e.http_status}: {e.msg}"
+                if i < 5 and all(r["How"].startswith("error") for r in rows) :
+                    bar.empty()
+                    st.error(f"Spotify is refusing searches ({e.http_status}: {e.msg}). "
+                             "Log out on page 1 and log in again, then retry.")
+                    st.stop()
             rows.append({
                 "#": i + 1, "Title": t.title, "Artist": t.artist,
                 "Spotify match": f"{hit['name']} — {', '.join(a['name'] for a in hit['artists'])}" if hit else "",
