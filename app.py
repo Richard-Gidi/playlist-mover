@@ -13,7 +13,9 @@ import spotipy
 import streamlit as st
 
 from apple_music import AppleMusicError, get_playlist, parse_pasted
-from spotify_tools import TOKEN_FILE, create_playlist, make_oauth, match_track
+import time
+
+from spotify_tools import TOKEN_FILE, RateLimited, create_playlist, make_client, make_oauth, match_track
 
 st.set_page_config(page_title="Playlist Mover", page_icon="🎧", layout="wide")
 
@@ -57,18 +59,24 @@ def spotify_client() -> spotipy.Spotify | None:
     if not oauth:
         return None
     tok = oauth.validate_token(oauth.cache_handler.get_cached_token())
-    return spotipy.Spotify(auth_manager=oauth) if tok else None
+    return make_client(oauth) if tok else None
 
 
+ss = st.session_state
 sp = spotify_client()
 me = None
 if sp:
-    try:
-        me = sp.current_user()
-    except spotipy.SpotifyException:
-        sp = None
+    # look the user up once per login, not on every click
+    tok = (oauth.cache_handler.get_cached_token() or {}).get("access_token")
+    if ss.get("me_for") == tok:
+        me = ss.get("me")
+    else:
+        try:
+            me = sp.current_user()
+            ss.me, ss.me_for = me, tok
+        except spotipy.SpotifyException:
+            sp = None
 
-ss = st.session_state
 ss.setdefault("tracks", [])
 ss.setdefault("source_name", "")
 ss.setdefault("results", None)
@@ -137,7 +145,7 @@ elif page.startswith("2"):
             with st.spinner("Reading the playlist…"):
                 try:
                     name, tracks, how = get_playlist(url)
-                    ss.tracks, ss.source_name, ss.results = tracks, name, None
+                    ss.tracks, ss.source_name, ss.results, ss.rows = tracks, name, None, []
                     st.success(f"**{name}**: {len(tracks)} songs, read from the {how}.")
                     st.caption("If that's fewer than the playlist has, Apple only showed part of it "
                                "on the page. Use *Paste a song list* to add the rest.")
@@ -156,7 +164,7 @@ elif page.startswith("2"):
         if st.button("Load list", type="primary", disabled=not text.strip()):
             new = parse_pasted(text)
             ss.tracks = (ss.tracks + new) if append else new
-            ss.source_name, ss.results = name, None
+            ss.source_name, ss.results, ss.rows = name, None, []
             st.success(f"{len(new)} songs added — {len(ss.tracks)} in total.")
 
     if ss.tracks:
@@ -183,27 +191,41 @@ else:
                                 value=0.60, step=0.05, format="%.2f")
     public = st.checkbox("Make the playlist public", value=False)
 
-    if st.button(f"Find {len(ss.tracks)} songs on Spotify", type="primary"):
-        bar = st.progress(0.0, text="Searching…")
-        rows = []
-        for i, t in enumerate(ss.tracks):
+    ss.setdefault("rows", [])
+    done = len(ss.rows)
+    label = (f"Find {len(ss.tracks)} songs on Spotify" if done == 0
+             else f"Continue searching ({done}/{len(ss.tracks)} done)")
+    if done < len(ss.tracks) and st.button(label, type="primary"):
+        bar = st.progress(done / len(ss.tracks), text="Searching…")
+        for i in range(done, len(ss.tracks)):
+            t = ss.tracks[i]
             try:
                 hit, s, how = match_track(sp, t)
+            except RateLimited as e:
+                bar.empty()
+                hrs = e.wait_s / 3600
+                st.error(f"Spotify has paused searches for this app for about "
+                         f"{hrs:.1f} h ({e.wait_s} s). {len(ss.rows)} songs are done and kept; "
+                         "come back after that and press Continue.")
+                break
             except spotipy.SpotifyException as e:
                 hit, s, how = None, 0.0, f"error {e.http_status}: {e.msg}"
-                if i < 5 and all(r["How"].startswith("error") for r in rows) :
-                    bar.empty()
-                    st.error(f"Spotify is refusing searches ({e.http_status}: {e.msg}). "
-                             "Log out on page 1 and log in again, then retry.")
-                    st.stop()
-            rows.append({
+            ss.rows.append({
                 "#": i + 1, "Title": t.title, "Artist": t.artist,
                 "Spotify match": f"{hit['name']} — {', '.join(a['name'] for a in hit['artists'])}" if hit else "",
                 "Score": s, "How": how, "uri": hit["uri"] if hit else "",
             })
+            if len(ss.rows) >= 5 and all(r["How"].startswith("error") for r in ss.rows[-5:]):
+                bar.empty()
+                st.error(f"Spotify keeps refusing searches ({how}). Log out on page 1, log in again, "
+                         "then press Continue.")
+                ss.rows = ss.rows[:-5]
+                break
             bar.progress((i + 1) / len(ss.tracks), text=f"Searching… {i + 1}/{len(ss.tracks)}")
-        bar.empty()
-        ss.results = pd.DataFrame(rows)
+            time.sleep(0.25)  # stay well under Spotify's rate limit
+        else:
+            bar.empty()
+        ss.results = pd.DataFrame(ss.rows) if ss.rows else None
 
     if ss.results is not None:
         df = ss.results.copy()

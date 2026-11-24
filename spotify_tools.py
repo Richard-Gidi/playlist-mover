@@ -74,25 +74,46 @@ def score(track: Track, cand: dict) -> float:
     return round(max(s, 0.0), 3)
 
 
+class RateLimited(Exception):
+    def __init__(self, wait_s: int):
+        super().__init__(f"Spotify rate limit, retry after {wait_s}s")
+        self.wait_s = wait_s
+
+
+def make_client(oauth: SpotifyOAuth) -> spotipy.Spotify:
+    # No automatic retries: spotipy would otherwise sleep through a long Retry-After
+    # (Spotify can ask for 24h) and the app would just look frozen.
+    return spotipy.Spotify(auth_manager=oauth, retries=0, status_retries=0, requests_timeout=15)
+
+
+def _search(sp: spotipy.Spotify, q: str, limit: int) -> list[dict]:
+    try:
+        return sp.search(q=q, type="track", limit=limit, market="from_token")["tracks"]["items"]
+    except spotipy.SpotifyException as e:
+        if e.http_status == 429:
+            wait = int((e.headers or {}).get("Retry-After", 60))
+            raise RateLimited(wait) from e
+        raise
+
+
 def match_track(sp: spotipy.Spotify, track: Track) -> tuple[dict | None, float, str]:
     if track.isrc:
-        items = sp.search(q=f"isrc:{track.isrc}", type="track", limit=1, market="from_token")["tracks"]["items"]
+        items = _search(sp, f"isrc:{track.isrc}", 1)
         if items:
             return items[0], 1.0, "ISRC"
 
     title = clean_title(track.title)
     artist = lead_artist(track.artist)
-    queries = [f'track:"{title}" artist:"{artist}"', f"{title} {artist}"] if artist else [title]
+    # one precise query; only fall back to a loose one when it finds nothing at all
+    items = _search(sp, f'track:"{title}" artist:"{artist}"' if artist else title, 5)
+    if not items and artist:
+        items = _search(sp, f"{title} {artist}", 5)
 
     best, best_s = None, 0.0
-    for q in queries:
-        items = sp.search(q=q, type="track", limit=5, market="from_token")["tracks"]["items"]
-        for c in items:
-            s = score(track, c)
-            if s > best_s:
-                best, best_s = c, s
-        if best_s >= 0.85:
-            break
+    for c in items:
+        sc = score(track, c)
+        if sc > best_s:
+            best, best_s = c, sc
     return best, best_s, ("search" if best else "not found")
 
 
