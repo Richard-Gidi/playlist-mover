@@ -1,19 +1,41 @@
 # Playlist Mover
 
-Moves an Apple Music playlist into Spotify. You log in to Spotify only; no Apple account is needed.
+Copy playlists between music apps: paste a link, check the matches, and send it.
 
-## Use
-1. **Connect Spotify**: log in.
-2. **Load playlist**: paste a public Apple Music link, or upload or paste a song list (`Title - Artist` or `Title<TAB>Artist`, one per line).
-3. **Match & build**: find the songs on Spotify, untick any wrong matches, then create the playlist.
+| Platform | Copy from | Create playlist in |
+|---|---|---|
+| Apple Music | ✓ public playlist links | — (use the link sheet) |
+| Spotify | ✓ public links; full list when logged in | ✓ |
+| YouTube / YouTube Music | ✓ public or unlisted playlists | ✓ beta |
+| Deezer | ✓ public playlists (with ISRC codes) | — (use the link sheet) |
+| Text / CSV list | ✓ | — |
+| Any other app | — | Link sheet (one button per song for 8 services) + CSV |
+
+Apple Music and Deezer only let large, approved apps create playlists, so for those the app makes a
+link sheet instead.
+
+## How it works
+1. **Source**: paste a link or upload a list. You get a playlist card, its "DNA" (top artists, running time) and a cover wall.
+2. **Destination**: Spotify, YouTube Music or Any other app. Connect your account.
+3. **Match**: every song is searched. ISRC codes or same-app IDs give exact matches; otherwise title and artist are scored.
+   Untick wrong ones, or use **Fix a song yourself** to pick the right version.
+4. **Transfer**: create the playlist (Spotify can also copy the original cover), or download the link sheet and CSV.
 
 ## Deploy on Render
-`render.yaml` sets up a free Python web service. Set these environment variables:
-- `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`: from your app at developer.spotify.com/dashboard
-- `SPOTIFY_REDIRECT_URI`: `https://<your-service>.onrender.com/` (add the same value to the Spotify app's Redirect URIs)
+`render.yaml` sets up a free Python web service. Environment variables:
+- `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI` (`https://<service>.onrender.com/`)
+- Optional, for YouTube Music: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. In Google Cloud, create a project,
+  enable **YouTube Data API v3**, and make an OAuth client of type **TVs and Limited Input devices**. While the
+  consent screen is in Testing, add each Google account under Test users.
 
-Spotify apps in development mode only allow accounts listed under *User Management*.
+Spotify development-mode apps allow up to 5 users, added under *User Management*, and the app owner needs
+Premium. The request quota is shared by everyone using the app, so the app slows its searches down and pauses
+cleanly if Spotify asks it to.
 
 ## Run locally
-Double-click `run_app.bat`, or run `streamlit run app.py --server.address 127.0.0.1 --server.port 8501`,
-then paste your Spotify credentials on page 1 (redirect URI `http://127.0.0.1:8501/`).
+Double-click `run_app.bat`, or run `streamlit run app.py --server.address 127.0.0.1 --server.port 8501`.
+Then open **Setup** in the menu to enter your keys (redirect URI `http://127.0.0.1:8501/`).
+
+## Files
+`app.py` pages and flow · `sources.py` readers · `targets.py` Spotify, YouTube Music and exports ·
+`core.py` matching · `ui.py` design · `store.py` per-visitor state
