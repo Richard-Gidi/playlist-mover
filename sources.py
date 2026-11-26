@@ -57,6 +57,8 @@ def _get(url: str, **kw) -> requests.Response:
         raise SourceError(f"Couldn't reach {urlparse(url).netloc}: {e}") from e
     if r.status_code != 200:
         raise SourceError(f"{urlparse(url).netloc} answered {r.status_code}. Is the playlist public?")
+    if not r.encoding or r.encoding.lower() in ("iso-8859-1", "latin-1", "ascii"):
+        r.encoding = "utf-8"  # pages that omit a charset are UTF-8 in practice (emoji in titles)
     return r
 
 

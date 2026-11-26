@@ -11,7 +11,8 @@ CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
 :root{--violet:#7C5CFF;--pink:#FF4D8D;--cyan:#22D3EE;--card:rgba(255,255,255,.035);--line:rgba(255,255,255,.08);--muted:#9a9ab0}
-html,body,[data-testid="stAppViewContainer"] *{font-family:'Inter',system-ui,sans-serif}
+.stApp,.stApp p,.stApp li,.stApp label,.stApp input,.stApp textarea,.stApp button,.stApp td,.stApp th,
+.stMarkdown,.stMarkdown div{font-family:'Inter',system-ui,sans-serif}
 h1,h2,h3,h4,.pm-display{font-family:'Space Grotesk',system-ui,sans-serif!important;letter-spacing:-.02em}
 [data-testid="stAppViewContainer"]{background:
   radial-gradient(1100px 560px at 8% -12%,rgba(124,92,255,.20),transparent 60%),
@@ -35,12 +36,14 @@ h1,h2,h3,h4,.pm-display{font-family:'Space Grotesk',system-ui,sans-serif!importa
 .pm-grad{background:linear-gradient(92deg,#fff 0%,#d6caff 35%,#ff9cc2 65%,#86ecff 100%);-webkit-background-clip:text;
   background-clip:text;color:transparent}
 .pm-sub{color:var(--muted);font-size:1.08rem;max-width:620px}
-.pm-route{display:flex;align-items:center;gap:12px;margin:26px 0 8px;flex-wrap:wrap}
+.pm-route{display:flex;align-items:center;gap:12px;margin:22px 0 8px}
+.pm-hero .pm-route{display:grid;grid-template-columns:auto minmax(18px,1fr) auto minmax(18px,1fr) auto;gap:10px}
+@media (max-width:640px){.pm-hero .pm-route{grid-template-columns:1fr}.pm-hero .pm-route .pm-line{display:none}}
 .pm-stack{display:flex;flex-direction:column;gap:8px}
 .pm-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.05);
   border:1px solid var(--line);font-weight:600;font-size:.9rem;white-space:nowrap}
 .pm-dot{width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 12px var(--c)}
-.pm-line{flex:1;min-width:70px;height:2px;border-radius:2px;position:relative;overflow:hidden;
+.pm-line{flex:1;min-width:18px;height:2px;border-radius:2px;position:relative;overflow:hidden;
   background:linear-gradient(90deg,var(--a),var(--b))}
 .pm-line::after{content:"";position:absolute;top:-3px;left:-10%;width:8px;height:8px;border-radius:50%;background:#fff;
   box-shadow:0 0 14px #fff;animation:pm-travel 2.4s linear infinite}
@@ -62,7 +65,7 @@ h1,h2,h3,h4,.pm-display{font-family:'Space Grotesk',system-ui,sans-serif!importa
 .pm-bar-row{display:grid;grid-template-columns:minmax(90px,170px) 1fr 30px;gap:10px;align-items:center;margin:7px 0;font-size:.88rem}
 .pm-bar{height:8px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
 .pm-bar>span{display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,var(--violet),var(--pink))}
-.pm-mosaic{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.pm-mosaic{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .pm-mosaic img{width:100%;aspect-ratio:1;border-radius:9px;object-fit:cover;opacity:.92}
 .pm-rings{display:flex;gap:26px;flex-wrap:wrap;align-items:center}
 .pm-ring{width:112px;height:112px;border-radius:50%;display:grid;place-items:center;
@@ -180,21 +183,21 @@ def dna_card(pl):
         return
     mx = d["top"][0][1]
     bars = "".join(
-        f'<div class="pm-bar-row"><span>{e(a)}</span><div class="pm-bar"><span style="width:{n / mx * 100:.0f}%"></span>'
+        f'<div class="pm-bar-row"><span>{e(a)}</span><div class="pm-bar"><span style="width:{n / mx * 100:.0f}%">&#8203;</span>'
         f'</div><span class="pm-meta">{n}</span></div>' for a, n in d["top"])
     longest = ""
     if d["longest"] is not None and d["longest"].duration_ms:
         t = d["longest"]
         longest = f'<div class="pm-meta" style="margin-top:10px">Longest song: <b>{e(t.title)}</b> by {e(t.artist)} ({fmt_ms(t.duration_ms)})</div>'
-    arts = [t.art for t in pl.tracks if t.art][:16]
+    arts = list(dict.fromkeys(t.art for t in pl.tracks if t.art))[:12]
     mosaic = ('<div class="pm-mosaic" style="margin-top:4px">' + "".join(f'<img src="{e(a)}" alt="">' for a in arts)
-              + "</div>") if len(arts) >= 8 else ""
-    c1, c2 = st.columns([1, 1])
+              + "</div>") if len(arts) >= 4 else ""
+    c1, c2 = st.columns([1.15, 1]) if mosaic else (st.container(), None)
     with c1:
         st.markdown(f'<div class="pm-card"><div class="pm-eyebrow">Playlist DNA · most played artists</div>'
                     f'<div style="margin-top:10px">{bars}</div>{longest}</div>', unsafe_allow_html=True)
-    with c2:
-        if mosaic:
+    if c2 is not None:
+        with c2:
             st.markdown(f'<div class="pm-card"><div class="pm-eyebrow">Cover wall</div>'
                         f'<div style="margin-top:12px">{mosaic}</div></div>', unsafe_allow_html=True)
 

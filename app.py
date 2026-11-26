@@ -84,7 +84,7 @@ def paused_banner(platform="spotify"):
 def page_home():
     flash()
     ui.hero()
-    c1, c2, _ = st.columns([1, 1, 3])
+    c1, c2, _ = st.columns([1.4, 1, 1.6])
     if c1.button("Start a transfer →", type="primary", width="stretch"):
         go("source")
     if job.get("playlist") and c2.button("Resume", width="stretch"):
@@ -575,7 +575,9 @@ with st.sidebar:
     st.write("")
 
 pg = st.navigation(nav)
+pg.run()
 
+# sidebar status is drawn after the page so it reflects what the page just did
 with st.sidebar:
     st.divider()
     pl = job.get("playlist")
@@ -593,5 +595,3 @@ with st.sidebar:
     rows = job.get("rows") or []
     if rows and pl:
         st.progress(len(rows) / max(len(pl.tracks), 1), text=f"{len(rows)}/{len(pl.tracks)} searched")
-
-pg.run()
