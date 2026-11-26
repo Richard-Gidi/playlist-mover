@@ -13,8 +13,26 @@ PLATFORMS = {
     "youtube": ("YouTube Music", "#FF0033", True,  True),
     "deezer":  ("Deezer",        "#A238FF", True,  False),
     "text":    ("Song list",     "#9CA3AF", True,  False),
+    "tmm":     ("Via TuneMyMusic", "#FFB020", False, True),
     "export":  ("Any other app", "#22D3EE", False, True),
 }
+
+# services reachable through TuneMyMusic's "upload a CSV" pages: label -> (url slug, colour)
+TMM_SERVICES = {
+    "Apple Music": ("apple-music", "#FA2D48"),
+    "Deezer": ("deezer", "#A238FF"),
+    "Boomplay": ("boomplay", "#2E7CF6"),
+    "Audiomack": ("audiomack", "#FFA200"),
+    "TIDAL": ("tidal", "#E5E7EB"),
+    "Amazon Music": ("amazon-music", "#25D1DA"),
+    "SoundCloud": ("soundcloud", "#FF5500"),
+    "YouTube Music": ("youtube-music", "#FF0033"),
+    "Spotify": ("spotify", "#1ED760"),
+}
+
+
+def tmm_url(service: str) -> str:
+    return f"https://www.tunemymusic.com/transfer/csv-to-{TMM_SERVICES[service][0]}"
 
 
 def label(key: str) -> str:

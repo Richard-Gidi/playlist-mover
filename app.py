@@ -13,7 +13,7 @@ import streamlit as st
 import store
 import targets as T
 import ui
-from core import PLATFORMS, Candidate, RateLimited, best_of, colour, label, split_artists
+from core import PLATFORMS, TMM_SERVICES, Candidate, RateLimited, best_of, colour, label, split_artists, tmm_url
 from sources import SourceError, detect, parse_text, read_url
 
 st.set_page_config(page_title="Playlist Mover", page_icon="🎧", layout="wide")
@@ -174,24 +174,39 @@ def page_destination():
             go("source")
         return
     st.markdown("## Where should it go?")
-    options = ["spotify", "youtube", "export"]
+    options = ["spotify", "youtube", "tmm", "export"]
     if ss.get("dest_pick") not in options:
         ss.dest_pick = job.get("target") if job.get("target") in options else "spotify"
     pick = st.radio("Destination", options, key="dest_pick",
                     format_func=lambda k: {"spotify": "Spotify", "youtube": "YouTube Music (beta)",
-                                           "export": "Any other app (link sheet + CSV)"}[k],
+                                           "tmm": "Apple Music, Deezer, Boomplay & more",
+                                           "export": "Just the files"}[k],
                     horizontal=True, label_visibility="collapsed")
     if pick != job.get("target"):
         job["target"] = pick
         job.pop("rows", None)
         job.pop("result", None)
-    ui.route(pl.platform, pick)
+    if pick == "tmm":
+        names = list(TMM_SERVICES)
+        if ss.get("tmm_pick") not in names:
+            ss.tmm_pick = job.get("tmm_service") if job.get("tmm_service") in names else "Apple Music"
+        svc = st.selectbox("Which app?", names, key="tmm_pick")
+        job["tmm_service"] = svc
+        ui.route(pl.platform, "tmm", svc, TMM_SERVICES[svc][1])
+    else:
+        ui.route(pl.platform, pick)
 
     ready = False
     if pick == "spotify":
         ready = _connect_spotify()
     elif pick == "youtube":
         ready = _connect_youtube()
+    elif pick == "tmm":
+        ui.card(f"<h4 style='margin-top:0'>Handed off to TuneMyMusic</h4><div class='pm-meta'>{ui.e(svc)} doesn't let "
+                f"small apps create playlists, so Playlist Mover prepares the file and TuneMyMusic, a free transfer "
+                f"service, builds the playlist. You only sign in to <b>{ui.e(svc)}</b>, on TuneMyMusic's page. "
+                f"Playlist Mover never sees that login.</div>")
+        ready = True
     else:
         ui.card("<h4 style='margin-top:0'>No login needed</h4><div class='pm-meta'>You'll get a link sheet: a page "
                 "with one button per song for Apple Music, Spotify, YouTube Music, Deezer, Tidal, Amazon Music, "
@@ -199,9 +214,9 @@ def page_destination():
                 "accept.</div>")
         ready = True
 
-    if ready and st.button("Next: match the songs →" if pick != "export" else "Next: get the files →",
+    if ready and st.button("Next: match the songs →" if pick in ("spotify", "youtube") else "Next: get the files →",
                            type="primary"):
-        go("transfer" if pick == "export" else "match")
+        go("transfer" if pick in ("export", "tmm") else "match")
 
 
 def _connect_spotify() -> bool:
@@ -303,7 +318,7 @@ def page_match():
         if st.button("Back to the start", type="primary"):
             go("source" if not pl else "destination")
         return
-    if target == "export":
+    if target in ("export", "tmm"):
         go("transfer")
     client = _client_for(target)
     if client is None:
@@ -465,7 +480,14 @@ def page_transfer():
         st.info("Pick a playlist and a destination first.")
         return
     st.markdown("## Make it yours")
-    ui.route(pl.platform, target)
+    svc = job.get("tmm_service", "Apple Music") if target == "tmm" else None
+    if svc:
+        ui.route(pl.platform, "tmm", svc, TMM_SERVICES[svc][1])
+    else:
+        ui.route(pl.platform, target)
+    safe = "".join(ch for ch in pl.name if ch.isalnum() or ch in " -_").strip() or "playlist"
+    if svc:
+        _tmm_handoff(pl, svc, safe)
 
     res = job.get("result")
     if target in ("spotify", "youtube"):
@@ -514,7 +536,6 @@ def page_transfer():
     if target in ("spotify", "youtube") and job.get("rows"):
         left_out = [pl.tracks[r["i"]] for r in job["rows"] if not (r["add"] and r["cand"])]
     c1, c2, c3 = st.columns(3)
-    safe = "".join(ch for ch in pl.name if ch.isalnum() or ch in " -_").strip() or "playlist"
     c1.download_button("Link sheet (every app)", T.link_sheet(pl.name, pl.tracks), file_name=f"{safe} - links.html",
                        mime="text/html", width="stretch", type="primary" if target == "export" else "secondary")
     c2.download_button("CSV of all songs", T.export_csv(pl.tracks), file_name=f"{safe}.csv", mime="text/csv",
@@ -528,6 +549,28 @@ def page_transfer():
         for k in ("playlist", "rows", "result", "fix"):
             job.pop(k, None)
         go("source")
+
+
+def _tmm_handoff(pl, svc, safe):
+    st.markdown(
+        f'<div class="pm-card"><div class="pm-eyebrow">Two steps to {ui.e(svc)}</div>'
+        f'<div class="pm-grid" style="margin-top:12px">'
+        f'<div><span class="pm-num">01</span><h4 style="margin:.2rem 0">Download the song file</h4>'
+        f'<div class="pm-meta">{len(pl.tracks)} songs with title, artist, album and ISRC, ready for TuneMyMusic.</div></div>'
+        f'<div><span class="pm-num">02</span><h4 style="margin:.2rem 0">Open TuneMyMusic</h4>'
+        f'<div class="pm-meta">Upload the file, sign in to {ui.e(svc)}, press <b>Start Transfer</b>. '
+        f'Songs it can\'t find are listed in a "Missing" report.</div></div></div></div>',
+        unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    got = c1.download_button(f"① Download {safe}.csv", T.export_csv(pl.tracks), file_name=f"{safe}.csv",
+                             mime="text/csv", type="primary", width="stretch")
+    if got:
+        job["tmm_downloaded"] = True
+    c2.link_button(f"② Open TuneMyMusic for {svc} ↗", tmm_url(svc), width="stretch",
+                   type="primary" if job.get("tmm_downloaded") else "secondary")
+    st.caption(f"TuneMyMusic opens in a new tab. It can't be shown inside this page, because its site doesn't "
+               f"allow embedding, and {svc}'s sign-in would break inside a frame anyway. Its free plan may cap how "
+               f"many songs move per transfer.")
 
 
 # =====================================================================

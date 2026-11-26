@@ -4,15 +4,17 @@ Copy playlists between music apps: paste a link, check the matches, and send it.
 
 | Platform | Copy from | Create playlist in |
 |---|---|---|
-| Apple Music | ✓ public playlist links | — (use the link sheet) |
+| Apple Music | ✓ public playlist links | ✓ via TuneMyMusic hand-off |
 | Spotify | ✓ public links; full list when logged in | ✓ |
 | YouTube / YouTube Music | ✓ public or unlisted playlists | ✓ beta |
-| Deezer | ✓ public playlists (with ISRC codes) | — (use the link sheet) |
+| Deezer | ✓ public playlists (with ISRC codes) | ✓ via TuneMyMusic hand-off |
+| Boomplay, Audiomack, TIDAL, Amazon Music, SoundCloud | — | ✓ via TuneMyMusic hand-off |
 | Text / CSV list | ✓ | — |
 | Any other app | — | Link sheet (one button per song for 8 services) + CSV |
 
-Apple Music and Deezer only let large, approved apps create playlists, so for those the app makes a
-link sheet instead.
+Apple Music, Deezer and the others only let large, approved apps create playlists. For those, Playlist Mover
+prepares a CSV and opens TuneMyMusic's matching "CSV to <app>" page. You upload the file and sign in to the
+destination app there. TuneMyMusic can't be embedded, because its site forbids framing.
 
 ## How it works
 1. **Source**: paste a link or upload a list. You get a playlist card, its "DNA" (top artists, running time) and a cover wall.

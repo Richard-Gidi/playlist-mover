@@ -95,8 +95,8 @@ def e(s) -> str:
     return html.escape(str(s or ""))
 
 
-def chip(key: str, text: str | None = None) -> str:
-    return f'<span class="pm-chip"><span class="pm-dot" style="--c:{colour(key)}"></span>{e(text or label(key))}</span>'
+def chip(key: str, text: str | None = None, c: str | None = None) -> str:
+    return f'<span class="pm-chip"><span class="pm-dot" style="--c:{c or colour(key)}"></span>{e(text or label(key))}</span>'
 
 
 def steps(now: int):
@@ -108,15 +108,16 @@ def steps(now: int):
     st.markdown(f'<div class="pm-steps">{"".join(out)}</div>', unsafe_allow_html=True)
 
 
-def route(src: str, dst: str):
+def route(src: str, dst: str, dst_text: str | None = None, dst_colour: str | None = None):
+    b = dst_colour or colour(dst)
     st.markdown(
-        f'<div class="pm-route">{chip(src)}<div class="pm-line" style="--a:{colour(src)};--b:{colour(dst)}"></div>'
-        f'{chip(dst)}</div>', unsafe_allow_html=True)
+        f'<div class="pm-route">{chip(src)}<div class="pm-line" style="--a:{colour(src)};--b:{b}"></div>'
+        f'{chip(dst, dst_text, dst_colour)}</div>', unsafe_allow_html=True)
 
 
 def hero():
     sources = "".join(chip(k) for k in ("apple", "spotify", "youtube", "deezer"))
-    dests = "".join(chip(k) for k in ("spotify", "youtube", "export"))
+    dests = "".join(chip(k) for k in ("spotify", "youtube")) + chip("tmm", "Apple Music, Deezer, Boomplay…", "#FFB020")
     st.markdown(f"""
 <div class="pm-hero">
   <div class="pm-eyebrow">Playlist Mover</div>
@@ -145,7 +146,7 @@ def features():
 def matrix():
     rows = []
     for k, (name, c, can_read, can_write) in PLATFORMS.items():
-        if k in ("text",):
+        if k in ("text", "tmm"):
             continue
         r = '<span class="pm-yes">✓</span>' if can_read else '<span class="pm-no">—</span>'
         if k == "youtube":
@@ -153,7 +154,8 @@ def matrix():
         elif k == "export":
             w = '<span class="pm-yes">✓</span> link sheet + CSV'
         else:
-            w = '<span class="pm-yes">✓</span>' if can_write else '<span class="pm-no">— use the link sheet</span>'
+            w = ('<span class="pm-yes">✓</span>' if can_write
+                 else '<span class="pm-yes">✓</span> via TuneMyMusic hand-off')
         rows.append(f"<tr><td>{chip(k)}</td><td>{r}</td><td>{w}</td></tr>")
     st.markdown(f'<div class="pm-card"><table class="pm-matrix"><tr><th>Platform</th><th>Copy from</th>'
                 f'<th>Create playlist in</th></tr>{"".join(rows)}</table></div>', unsafe_allow_html=True)
